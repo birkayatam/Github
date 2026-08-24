@@ -287,22 +287,25 @@ DIVA_HEADERS = [
 ]
 assert len(DIVA_HEADERS) == 35
 DIVA_CALC_HEADERS = [
-    "Eşleştirme\nAnahtarı", "Kampanya\nBulundu mu", "Kampanya\nBaşlangıç", "Kampanya\nBitiş",
+    "Eşleştirme Anahtarı\n(Ürün Düzeyi -\nFaturaNo+Ürün)",
+    "Eşleştirme Anahtarı\n(Kampanya Düzeyi -\nFaturaNo+Ürün+Kampanya)",
+    "Kampanya\nBulundu mu", "Kampanya\nBaşlangıç", "Kampanya\nBitiş",
     "Hakediş\nSon Tarihi", "Fatura Tarihi\nKampanya\nAralığında mı", "Sabit Hakediş\nTutarı (varsa)",
-    "Beklenen\nHakediş Tutarı", "Uygulanacak\nKural",
+    "Beklenen\nHakediş Tutarı", "Uygulanacak\nKural (Ön Beklenti)",
 ]
 
 ws = wb.create_sheet("DIVA Satislari")
 ws.sheet_view.showGridLines = False
 ws.freeze_panes = "A3"
-set_widths(ws, [11] * 35 + [16, 12, 11, 11, 11, 12, 13, 13, 20])
+set_widths(ws, [11] * 35 + [18, 20, 12, 11, 11, 11, 12, 13, 13, 20])
 header_row(ws, 1, DIVA_HEADERS, RAW_HEADER_FILL, RAW_HEADER_FONT, height=44)
 header_row(ws, 1, DIVA_CALC_HEADERS, CALC_HEADER_FILL, HEADER_FONT, height=44, start_col=36)
 
 DS_FIRST, DS_LAST = 3, 1002
 FATURANO_C, URUNKODU_C, FATURATARIHI_C, PAKETADI_C, TOPLAMINDIRIM_C = 9, 18, 8, 15, 30
-KEY_C = 36
-KAMP_BULUNDU_C, KBAS_C, KBIT_C, KSON_C, ARALIK_C, SABIT_C, BEKLENEN_C, KURAL_C = 37, 38, 39, 40, 41, 42, 43, 44
+DSKEY2_C = 36  # urun duzeyi (E2E eslestirmesi icin: bir urun birden fazla kampanyaya konu olabilir)
+KEY_C = 37     # kampanya duzeyi (Hakedis Fatura Detay eslestirmesi icin)
+KAMP_BULUNDU_C, KBAS_C, KBIT_C, KSON_C, ARALIK_C, SABIT_C, BEKLENEN_C, KURAL_C = 38, 39, 40, 41, 42, 43, 44, 45
 
 example_diva = ["BSHMDEMIR", "MUSTAFA DEMİREL", "BSHMDEMIR", "MUSTAFA DEMİREL", "7000129546", "Bosch-LDA",
     "", "24.08.2026", "2600000650", "", "", "X000002267", "ÖRNEK MÜŞTERİ", "Fatura altı indirim",
@@ -342,7 +345,8 @@ for row in range(DS_FIRST, DS_LAST + 1):
     sabit = f"{L(SABIT_C)}{row}"
 
     formulas = {
-        KEY_C: f'=IF({fno}="","",{fno}&"|"&{urun})',
+        DSKEY2_C: f'=IF({fno}="","",{fno}&"|"&{urun})',
+        KEY_C: f'=IF({fno}="","",{fno}&"|"&{urun}&"|"&{paket})',
         KAMP_BULUNDU_C: f'=IF({fno}="","",IF(ISNA(MATCH({paket},{KAMP_NAME_RNG},0)),"Hayır - Kampanyalar\'da Yok","Evet"))',
         KBAS_C: f'=IF({fno}="","",IFERROR(INDEX({KAMP_START_RNG},MATCH({paket},{KAMP_NAME_RNG},0)),""))',
         KBIT_C: f'=IF({fno}="","",IFERROR(INDEX({KAMP_END_RNG},MATCH({paket},{KAMP_NAME_RNG},0)),""))',
@@ -365,6 +369,7 @@ for row in range(DS_FIRST, DS_LAST + 1):
             c.number_format = CUR
 
 DS_KEY_RNG = f"'DIVA Satislari'!${get_column_letter(KEY_C)}${DS_FIRST}:${get_column_letter(KEY_C)}${DS_LAST}"
+DS_KEY2_RNG = f"'DIVA Satislari'!${get_column_letter(DSKEY2_C)}${DS_FIRST}:${get_column_letter(DSKEY2_C)}${DS_LAST}"
 
 print("Part 3 (DIVA Satislari) done")
 
@@ -475,67 +480,115 @@ E2E_TETIK_RNG = f"'E2E Nakliye Montaj'!${get_column_letter(TETIK_C)}${E2E_FIRST}
 print("Part 4 (E2E) done")
 
 # ============================================================
-# 6) HAKEDIS FATURA DETAY  (placeholder yapı - gerçek örnek gelince kesinleşecek)
+# 6) HAKEDIS FATURA DETAY  (gercek Temmuz 2026 "TEMMUZ DETAY" export yapisi)
 # ============================================================
+HFD_HEADERS = [
+    "Satış id", "Bölge", "Alt Bölge", "Rut", "Bayi Kodu", "Nihai Kod", "Bayi Ünvanı", "Fatura No",
+    "Değişen Fatura No", "Ürün Kodu", "LPH 2", "LPH 3", "İade Durumu", "Satış Tipi", "Fatura Tipi",
+    "eLogo", "Kime Satış", "Ödeme Yöntemi", "Diva Yaratma Tarihi", "Fatura Tarihi", "Montaj Tarihi",
+    "Montaj Fiş No", "Nakliye Tarihi", "Nakliye Kaynağı", "Nakliye Fiş No", "Kampanya Adı 1",
+    "Kampanya Türü 1", "Yöntem 1", "Toplam Tutar 1", "Prim Fonundan 1", "Karlılıktan 1",
+    "Toplam Tutar H 1",
+]
+assert len(HFD_HEADERS) == 32
+HFD_CALC_HEADERS = [
+    "Eşleştirme Anahtarı\n(Ürün Düzeyi)", "Eşleştirme Anahtarı\n(Kampanya Düzeyi)",
+    "Kural (Ödeme\nYöntemine Göre)", "Nakliye Tarihi\n(Ayrıştırılmış)", "Hakediş\nTetikleyici Tarih",
+]
+
 ws = wb.create_sheet("Hakedis Fatura Detay")
 ws.sheet_view.showGridLines = False
 ws.freeze_panes = "A3"
-hfd_headers = ["Hakediş Fatura No", "Fatura Tarihi", "DİVA Fatura No\n(26...)", "Ürün Kodu",
-               "Kampanya / Paket Adı\n(bilgi amaçlı)", "Kalem Türü", "Tutar"]
-hfd_calc = ["Eşleştirme\nAnahtarı"]
-set_widths(ws, [16, 13, 14, 12, 26, 14, 13, 16])
-header_row(ws, 1, hfd_headers, RAW_HEADER_FILL, RAW_HEADER_FONT, height=36)
-header_row(ws, 1, hfd_calc, CALC_HEADER_FILL, HEADER_FONT, height=36, start_col=len(hfd_headers) + 1)
+set_widths(ws, [11] * 32 + [18, 20, 20, 16, 14])
+header_row(ws, 1, HFD_HEADERS, RAW_HEADER_FILL, RAW_HEADER_FONT, height=44)
+header_row(ws, 1, HFD_CALC_HEADERS, CALC_HEADER_FILL, HEADER_FONT, height=44, start_col=33)
 
-note = ws.cell(row=1, column=len(hfd_headers) + 3,
-    value="GEÇİCİ YAPI: Bu sekmenin sütunları, Temmuz 2026 hakediş detay excel örneği incelendikten sonra "
-          "gerçek yapıya göre güncellenecektir. Şimdilik eşleştirme için gereken asgari alanlar (DİVA Fatura "
-          "No + Ürün Kodu + Kalem Türü + Tutar) kullanılmıştır.")
+HFD_FIRST, HFD_LAST = 3, 1500
+(HFD_BAYIKODU_C, HFD_FATNO_C, HFD_URUN_C, HFD_ODEME_C, HFD_FATTAR_C, HFD_MONTTAR_C, HFD_MONTFIS_C,
+ HFD_NAKTAR_C, HFD_KAMPANYAADI_C, HFD_YONTEM1_C, HFD_TUTARH_C) = 5, 8, 10, 18, 20, 21, 22, 23, 26, 28, 32
+HFD_KEY2_C, HFD_KEY_C, HFD_KURAL_C, HFD_NAKTARP_C, HFD_TETIK_C = 33, 34, 35, 36, 37
+
+note = ws.cell(row=1, column=39,
+    value="Kaynak: BSH'nin bayiye gönderdiği aylık hakediş detay raporu (\"... DETAY\" sekmesi). Bir ürün "
+          "aynı anda birden fazla kampanyaya konu olabildiğinden (ör. tekil + bundle), aynı Fatura No + Ürün "
+          "Kodu için birden fazla satır olabilir; her satır 'Kampanya Adı 1' ile ayrı bir kampanya uygulamasını "
+          "temsil eder. Bu yüzden eşleştirme Fatura No + Ürün Kodu + Kampanya Adı üçlüsüyle yapılır.")
 note.font = NOTE_FONT
 note.alignment = Alignment(wrap_text=True, vertical="center")
-ws.row_dimensions[1].height = 36
+ws.row_dimensions[1].height = 44
 
-HFD_FIRST, HFD_LAST = 3, 1200
-HFD_FATNO_C, HFD_URUN_C, HFD_TUR_C, HFD_TUTAR_C, HFD_KEY_C = 3, 4, 6, 7, 8
-
-example_hfd = ["HFT-2026-000123", "05.09.2026", "2600000453", "SMS26DW00T",
-               "Mayıs-Tekil Bulaşık Makinesi Kampanyası-202605", "Fiyat Farkı", 3777.92]
+example_hfd = ["7000129546|2600007552", "TRBB", "TB3", "000TRRBB32", 7000129546, 7000129546,
+    "ÖRNEK BAYİ ÜNVANI LTD.ŞTİ.", 2600007552, "-", "SMS4IKW62T", "LDA", "Bosch-LDA-BULAŞIK MAKİNESİ",
+    "Geçerli", "Hemen Teslim", "e-Arşiv", "1", "Tüketici", "Mutabakat Yoksa",
+    "30.07.2026", "30.07.2026", "-", "-", "2026-07-31", "e2e", "TR01-20674473",
+    "Temmuz-Tekil Bulaşık Makinesi Kampanyası-202607", "Muhtelif Ürünler Fiyat Farkı",
+    "Montaj veya Nakliye", 3777.92, 0, 3777.92, 3777.92]
 for i, val in enumerate(example_hfd, start=1):
     c = ws.cell(row=2, column=i, value=val)
     c.font = EXAMPLE_FONT
     c.fill = EXAMPLE_FILL
     c.border = BORDER
     c.alignment = CENTER
-    if i == 2:
+    if i in (HFD_FATTAR_C, HFD_MONTTAR_C):
         c.number_format = DATE_FMT
-    if i == 7:
+    if i in (29, 30, 31, HFD_TUTARH_C):
         c.number_format = CUR
 
-dv_tur = DataValidation(type="list", formula1='"Fiyat Farkı,Bundle,Nakliye,Montaj,Diğer"', allow_blank=True)
-ws.add_data_validation(dv_tur)
-dv_tur.add(f"{get_column_letter(HFD_TUR_C)}{HFD_FIRST}:{get_column_letter(HFD_TUR_C)}{HFD_LAST}")
+dv_odeme = DataValidation(type="list", formula1='"Mutabakat Var,Mutabakat Yoksa"', allow_blank=True)
+ws.add_data_validation(dv_odeme)
+dv_odeme.add(f"{get_column_letter(HFD_ODEME_C)}{HFD_FIRST}:{get_column_letter(HFD_ODEME_C)}{HFD_LAST}")
+dv_yontem = DataValidation(type="list", formula1='"Diva Fatura,Montaj veya Nakliye"', allow_blank=True)
+ws.add_data_validation(dv_yontem)
+dv_yontem.add(f"{get_column_letter(HFD_YONTEM1_C)}{HFD_FIRST}:{get_column_letter(HFD_YONTEM1_C)}{HFD_LAST}")
 
 for row in range(HFD_FIRST, HFD_LAST + 1):
-    for col in range(1, 8):
+    for col in range(1, 33):
         c = ws.cell(row=row, column=col)
         c.fill = INPUT_FILL
         c.font = INPUT_FONT
         c.border = BORDER
         c.alignment = CENTER
-        if col == 2:
+        if col in (HFD_FATTAR_C, HFD_MONTTAR_C):
             c.number_format = DATE_FMT
-        if col == 7:
+        if col in (29, 30, 31, HFD_TUTARH_C):
             c.number_format = CUR
-    fatno = f"{get_column_letter(HFD_FATNO_C)}{row}"
-    urun = f"{get_column_letter(HFD_URUN_C)}{row}"
-    c = ws.cell(row=row, column=HFD_KEY_C, value=f'=IF({fatno}="","",{fatno}&"|"&{urun})')
-    c.font = FORMULA_FONT
-    c.border = BORDER
-    c.alignment = CENTER
+
+    L = get_column_letter
+    fno = f"{L(HFD_FATNO_C)}{row}"
+    urun = f"{L(HFD_URUN_C)}{row}"
+    odeme = f"{L(HFD_ODEME_C)}{row}"
+    fattar = f"{L(HFD_FATTAR_C)}{row}"
+    monttar = f"{L(HFD_MONTTAR_C)}{row}"
+    naktar = f"{L(HFD_NAKTAR_C)}{row}"
+    kampanya = f"{L(HFD_KAMPANYAADI_C)}{row}"
+    yontem1 = f"{L(HFD_YONTEM1_C)}{row}"
+    naktarp = f"{L(HFD_NAKTARP_C)}{row}"
+
+    formulas = {
+        HFD_KEY2_C: f'=IF({fno}="","",TEXT({fno},"0")&"|"&{urun})',
+        HFD_KEY_C: f'=IF({fno}="","",TEXT({fno},"0")&"|"&{urun}&"|"&{kampanya})',
+        HFD_KURAL_C: (f'=IF({fno}="","",IF({odeme}="Mutabakat Yoksa",'
+                      f'"Kural B - Nakliye/Montaj Sonrası Ödeme","Kural A - Hemen Ödeme (Stok Mutabakatlı)"))'),
+        HFD_NAKTARP_C: (f'=IF(OR({naktar}="",{naktar}="-"),"",IFERROR(DATE(VALUE(LEFT({naktar},4)),'
+                        f'VALUE(MID({naktar},6,2)),VALUE(RIGHT({naktar},2))),""))'),
+        HFD_TETIK_C: (f'=IF({fno}="","",IF({yontem1}="Diva Fatura",{fattar},'
+                      f'IF({naktarp}<>"",{naktarp},IF(ISNUMBER({monttar}),{monttar},""))))'),
+    }
+    for col, formula in formulas.items():
+        c = ws.cell(row=row, column=col, value=formula)
+        c.font = FORMULA_FONT
+        c.border = BORDER
+        c.alignment = CENTER
+        if col in (HFD_NAKTARP_C, HFD_TETIK_C):
+            c.number_format = DATE_FMT
 
 HFD_KEY_RNG = f"'Hakedis Fatura Detay'!${get_column_letter(HFD_KEY_C)}${HFD_FIRST}:${get_column_letter(HFD_KEY_C)}${HFD_LAST}"
-HFD_TUR_RNG = f"'Hakedis Fatura Detay'!${get_column_letter(HFD_TUR_C)}${HFD_FIRST}:${get_column_letter(HFD_TUR_C)}${HFD_LAST}"
-HFD_TUTAR_RNG = f"'Hakedis Fatura Detay'!${get_column_letter(HFD_TUTAR_C)}${HFD_FIRST}:${get_column_letter(HFD_TUTAR_C)}${HFD_LAST}"
+HFD_KEY2_RNG = f"'Hakedis Fatura Detay'!${get_column_letter(HFD_KEY2_C)}${HFD_FIRST}:${get_column_letter(HFD_KEY2_C)}${HFD_LAST}"
+HFD_ODEME_RNG = f"'Hakedis Fatura Detay'!${get_column_letter(HFD_ODEME_C)}${HFD_FIRST}:${get_column_letter(HFD_ODEME_C)}${HFD_LAST}"
+HFD_KURAL_RNG = f"'Hakedis Fatura Detay'!${get_column_letter(HFD_KURAL_C)}${HFD_FIRST}:${get_column_letter(HFD_KURAL_C)}${HFD_LAST}"
+HFD_YONTEM1_RNG = f"'Hakedis Fatura Detay'!${get_column_letter(HFD_YONTEM1_C)}${HFD_FIRST}:${get_column_letter(HFD_YONTEM1_C)}${HFD_LAST}"
+HFD_TETIK_RNG = f"'Hakedis Fatura Detay'!${get_column_letter(HFD_TETIK_C)}${HFD_FIRST}:${get_column_letter(HFD_TETIK_C)}${HFD_LAST}"
+HFD_TUTARH_RNG = f"'Hakedis Fatura Detay'!${get_column_letter(HFD_TUTARH_C)}${HFD_FIRST}:${get_column_letter(HFD_TUTARH_C)}${HFD_LAST}"
 
 print("Part 5 (Hakedis Fatura Detay) done")
 
@@ -549,16 +602,16 @@ ws.freeze_panes = "A3"
 KONTROL_COLS = [
     "Fatura No", "Ürün Kodu", "Ad Soyad", "Fatura\nTarihi", "Paket Adı\n(Kampanya)",
     "Kampanya\nBulundu mu", "Kampanya\nAralığında mı", "Hakediş\nSon Tarihi",
-    "Beklenen\nHakediş Tutarı", "Uygulanacak\nKural", "Nakliye\nİzlenebilir mi",
-    "Nakliye\nTamamlandı mı", "Montaj\nTamamlandı mı", "Hakediş\nTetikleyici Tarih",
-    "Süre İçinde\nTamamlandı mı", "Ödeme Zamanlaması\nDurumu", "Faturada\nBulunan Tutar",
-    "Tutar\nFarkı", "Tutar\nDurumu", "GENEL DURUM",
+    "Beklenen\nHakediş Tutarı", "Uygulanacak Kural\n(Ön Beklenti)", "Hakediş\nFaturasında\nBulundu mu",
+    "HFD Ödeme\nYöntemi", "HFD'ye Göre\nKural", "HFD\nYöntem 1", "HFD Hakediş\nTetikleyici Tarih",
+    "Süre İçinde\nTamamlandı mı", "E2E: Nakliye\nTamamlandı mı", "E2E: Montaj\nTamamlandı mı",
+    "E2E-HFD\nTutarlılığı", "Faturada\nBulunan Tutar", "Tutar\nFarkı", "Tutar\nDurumu", "GENEL DURUM",
 ]
-set_widths(ws, [13, 12, 16, 11, 26, 12, 12, 11, 13, 20, 11, 11, 11, 13, 12, 20, 13, 11, 15, 24])
-header_row(ws, 1, KONTROL_COLS, CALC_HEADER_FILL, HEADER_FONT, height=44)
+set_widths(ws, [13, 12, 16, 11, 26, 12, 12, 11, 13, 18, 13, 13, 16, 13, 14, 12, 12, 12, 14, 13, 11, 15, 24])
+header_row(ws, 1, KONTROL_COLS, CALC_HEADER_FILL, HEADER_FONT, height=48)
 
 K_FIRST, K_LAST = DS_FIRST, DS_LAST  # 1:1 aligned with DIVA Satislari rows
-(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T) = range(1, 21)
+(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W) = range(1, 24)
 
 L_ = get_column_letter
 for row in range(K_FIRST, K_LAST + 1):
@@ -573,14 +626,16 @@ for row in range(K_FIRST, K_LAST + 1):
     ds_son = ds(KSON_C)
     ds_beklenen = ds(BEKLENEN_C)
     ds_kural = ds(KURAL_C)
-    ds_key = ds(KEY_C)
+    ds_key = ds(KEY_C)     # kampanya duzeyi -> Hakedis Fatura Detay eslestirmesi
+    ds_key2 = ds(DSKEY2_C)   # urun duzeyi -> E2E eslestirmesi
 
-    a = f"{L_(A)}{row}"; e = f"{L_(E)}{row}"; f = f"{L_(F)}{row}"; g = f"{L_(G)}{row}"
-    h = f"{L_(H)}{row}"; j = f"{L_(J)}{row}"
-    k = f"{L_(K)}{row}"; l = f"{L_(L)}{row}"; m = f"{L_(M)}{row}"; n = f"{L_(N)}{row}"; o = f"{L_(O)}{row}"
-    p = f"{L_(P)}{row}"; i_ = f"{L_(I)}{row}"; q = f"{L_(Q)}{row}"; r_ = f"{L_(R)}{row}"; s_ = f"{L_(S)}{row}"
+    a = f"{L_(A)}{row}"; f = f"{L_(F)}{row}"; g = f"{L_(G)}{row}"; h = f"{L_(H)}{row}"
+    i_ = f"{L_(I)}{row}"; k = f"{L_(K)}{row}"; n = f"{L_(N)}{row}"; o = f"{L_(O)}{row}"
+    p = f"{L_(P)}{row}"; q = f"{L_(Q)}{row}"; r_ = f"{L_(R)}{row}"; s_ = f"{L_(S)}{row}"
+    t = f"{L_(T)}{row}"; u = f"{L_(U)}{row}"; v = f"{L_(V)}{row}"
 
-    match_e2e = f'MATCH({ds_key},{E2E_KEY_RNG},0)'
+    match_e2e = f'MATCH({ds_key2},{E2E_KEY_RNG},0)'
+    match_hfd = f'MATCH({ds_key},{HFD_KEY_RNG},0)'
     cells = {
         A: (f'=IF({ds_fno}="","",{ds_fno})', None),
         B: (f'=IF({ds_fno}="","",{ds_urun})', None),
@@ -592,25 +647,28 @@ for row in range(K_FIRST, K_LAST + 1):
         H: (f'=IF({ds_fno}="","",{ds_son})', DATE_FMT),
         I: (f'=IF({ds_fno}="","",{ds_beklenen})', CUR),
         J: (f'=IF({ds_fno}="","",{ds_kural})', None),
-        K: (f'=IF({ds_fno}="","",IFERROR(INDEX({E2E_NAKIZLE_RNG},{match_e2e}),"Eşleşme Yok"))', None),
-        L: (f'=IF({ds_fno}="","",IFERROR(INDEX({E2E_NAKTAM_RNG},{match_e2e}),"Hayır"))', None),
-        M: (f'=IF({ds_fno}="","",IFERROR(INDEX({E2E_MONTAM_RNG},{match_e2e}),"Hayır"))', None),
-        N: (f'=IF({ds_fno}="","",IFERROR(INDEX({E2E_TETIK_RNG},{match_e2e}),""))', DATE_FMT),
-        O: (f'=IF(OR({a}="",{n}=""),"",IF({n}<={h},"Evet","HAYIR - RİSK"))', None),
-        P: (f'=IF({a}="","",IF(LEFT({j},8)="Kural A ","Uygun - Hemen Ödenir (Yıl Sonu %75 Kontrolüne Tabi)",'
-            f'IF(OR({l}="Evet",{m}="Evet"),IF({o}="Evet","Uygun","RİSK - Hakediş Süresi Aşıldı"),'
-            f'"Bekleniyor - Nakliye/Montaj Tamamlanmadı")))', None),
-        Q: (f'=IF({a}="","",SUMIFS({HFD_TUTAR_RNG},{HFD_KEY_RNG},{ds_key},{HFD_TUR_RNG},"Fiyat Farkı")'
-            f'+SUMIFS({HFD_TUTAR_RNG},{HFD_KEY_RNG},{ds_key},{HFD_TUR_RNG},"Bundle"))', CUR),
-        R: (f'=IF({a}="","",{i_}-{q})', CUR),
-        S: (f'=IF({a}="","",IF(LEFT({p},7)="Bekleni","N/A - Henüz Ödenmemeli",'
-            f'IF(LEFT({p},4)="RİSK","İNCELEME GEREKLİ - Süre Aşımı",'
-            f'IF({r_}=0,"Doğru",IF({r_}>0,"EKSİK ÖDENMİŞ","FAZLA ÖDENMİŞ")))))', None),
-        T: (f'=IF({a}="","",IF({f}<>"Evet","İNCELEME GEREKLİ - Kampanya Tanımsız",'
+        K: (f'=IF({ds_fno}="","",IF(ISNA({match_hfd}),"Hayır - Henüz Faturalanmamış","Evet"))', None),
+        L: (f'=IF({k}<>"Evet","",IFERROR(INDEX({HFD_ODEME_RNG},{match_hfd}),""))', None),
+        M: (f'=IF({k}<>"Evet","",IFERROR(INDEX({HFD_KURAL_RNG},{match_hfd}),""))', None),
+        N: (f'=IF({k}<>"Evet","",IFERROR(INDEX({HFD_YONTEM1_RNG},{match_hfd}),""))', None),
+        O: (f'=IF({k}<>"Evet","",IFERROR(INDEX({HFD_TETIK_RNG},{match_hfd}),""))', DATE_FMT),
+        P: (f'=IF(OR({k}<>"Evet",{o}="",{h}=""),"",IF({o}<={h},"Evet","HAYIR - RİSK"))', None),
+        Q: (f'=IF({a}="","",IFERROR(INDEX({E2E_NAKTAM_RNG},{match_e2e}),"Hayır"))', None),
+        R: (f'=IF({a}="","",IFERROR(INDEX({E2E_MONTAM_RNG},{match_e2e}),"Hayır"))', None),
+        S: (f'=IF(OR({k}<>"Evet",{n}=""),"",IF({n}="Montaj veya Nakliye",'
+            f'IF(OR({q}="Evet",{r_}="Evet"),"Tutarlı","UYUŞMUYOR - E2E\'de Tamamlanma Yok"),'
+            f'"N/A - Hemen Ödeme Yöntemi"))', None),
+        T: (f'=IF({a}="","",SUMIF({HFD_KEY_RNG},{ds_key},{HFD_TUTARH_RNG}))', CUR),
+        U: (f'=IF({a}="","",{i_}-{t})', CUR),
+        V: (f'=IF({a}="","",IF({k}<>"Evet","Henüz Faturalanmadı",'
+            f'IF({u}=0,"Doğru",IF({u}>0,"EKSİK ÖDENMİŞ","FAZLA ÖDENMİŞ"))))', None),
+        W: (f'=IF({a}="","",IF({f}<>"Evet","İNCELEME GEREKLİ - Kampanya Tanımsız",'
             f'IF({g}<>"Evet","İNCELEME GEREKLİ - Tarih Dışı Satış",'
-            f'IF(LEFT({p},4)="RİSK","İNCELEME GEREKLİ - Hakediş Süresi Aşıldı",'
-            f'IF(OR({s_}="EKSİK ÖDENMİŞ",{s_}="FAZLA ÖDENMİŞ"),"İNCELEME GEREKLİ - Tutar Uyuşmazlığı",'
-            f'IF(LEFT({p},7)="Bekleni","Bekleniyor","Uygun"))))))', None),
+            f'IF({k}<>"Evet","Bekleniyor - Henüz Faturalanmadı",'
+            f'IF({p}="HAYIR - RİSK","İNCELEME GEREKLİ - Hakediş Süresi Aşıldı",'
+            f'IF(LEFT({s_},9)="UYUŞMUYOR","İNCELEME GEREKLİ - Nakliye/Montaj Tutarsızlığı",'
+            f'IF(OR({v}="EKSİK ÖDENMİŞ",{v}="FAZLA ÖDENMİŞ"),"İNCELEME GEREKLİ - Tutar Uyuşmazlığı",'
+            f'"Uygun")))))))', None),
     }
     for col, (formula, fmt) in cells.items():
         c = ws.cell(row=row, column=col, value=formula)
@@ -619,19 +677,19 @@ for row in range(K_FIRST, K_LAST + 1):
         c.alignment = CENTER
         if fmt:
             c.number_format = fmt
-        if col == T:
+        if col == W:
             c.font = Font(name=FONT, size=9, bold=True)
 
 K_A_RNG = f"Kontrol!${L_(A)}${K_FIRST}:${L_(A)}${K_LAST}"
 K_F_RNG = f"Kontrol!${L_(F)}${K_FIRST}:${L_(F)}${K_LAST}"
 K_I_RNG = f"Kontrol!${L_(I)}${K_FIRST}:${L_(I)}${K_LAST}"
 K_J_RNG = f"Kontrol!${L_(J)}${K_FIRST}:${L_(J)}${K_LAST}"
-K_L_RNG = f"Kontrol!${L_(L)}${K_FIRST}:${L_(L)}${K_LAST}"
-K_M_RNG = f"Kontrol!${L_(M)}${K_FIRST}:${L_(M)}${K_LAST}"
 K_Q_RNG = f"Kontrol!${L_(Q)}${K_FIRST}:${L_(Q)}${K_LAST}"
 K_R_RNG = f"Kontrol!${L_(R)}${K_FIRST}:${L_(R)}${K_LAST}"
-K_S_RNG = f"Kontrol!${L_(S)}${K_FIRST}:${L_(S)}${K_LAST}"
 K_T_RNG = f"Kontrol!${L_(T)}${K_FIRST}:${L_(T)}${K_LAST}"
+K_U_RNG = f"Kontrol!${L_(U)}${K_FIRST}:${L_(U)}${K_LAST}"
+K_V_RNG = f"Kontrol!${L_(V)}${K_FIRST}:${L_(V)}${K_LAST}"
+K_W_RNG = f"Kontrol!${L_(W)}${K_FIRST}:${L_(W)}${K_LAST}"
 
 print("Part 6 (Kontrol) done")
 
@@ -658,7 +716,7 @@ rows = [
     ("Kural A Kapsamında Hakediş Ödenen Satış Sayısı",
      f'=SUMPRODUCT((LEFT({K_J_RNG},8)="Kural A ")*({K_A_RNG}<>""))', None),
     ("Bunlardan Nakliye VEYA Montaj Tamamlanan Sayısı",
-     f'=SUMPRODUCT((LEFT({K_J_RNG},8)="Kural A ")*((({K_L_RNG}="Evet")+({K_M_RNG}="Evet"))>0))', None),
+     f'=SUMPRODUCT((LEFT({K_J_RNG},8)="Kural A ")*((({K_Q_RNG}="Evet")+({K_R_RNG}="Evet"))>0))', None),
     ("Nakliye/Montaj Tamamlanma Oranı", None, "0.0%"),
     ("Minimum Eşik", f'={P_ESIK}', "0.0%"),
     ("Eşik Karşılanıyor mu", None, None),
@@ -726,16 +784,17 @@ summary = [
     ("Kural A (Hemen Ödeme) Satış Sayısı", f'=COUNTIF({K_J_RNG},"Kural A*")', None, False),
     ("Kural B (Nakliye/Montaj Sonrası) Satış Sayısı", f'=COUNTIF({K_J_RNG},"Kural B*")', None, False),
     ("Toplam Beklenen Hakediş Tutarı", f'=SUMIF({K_A_RNG},"<>",{K_I_RNG})', CUR, False),
-    ("Faturada Bulunan Toplam Tutar", f'=SUMIF({K_A_RNG},"<>",{K_Q_RNG})', CUR, False),
-    ("Toplam Tutar Farkı", f'=SUMIF({K_A_RNG},"<>",{K_R_RNG})', CUR, False),
-    ("Eksik Ödenmiş Satış Sayısı", f'=COUNTIF({K_S_RNG},"EKSİK ÖDENMİŞ")', None, True),
-    ("Fazla Ödenmiş Satış Sayısı", f'=COUNTIF({K_S_RNG},"FAZLA ÖDENMİŞ")', None, True),
-    ("Kampanya Tanımsız (Kampanyalar Sekmesinde Yok)", f'=COUNTIF({K_T_RNG},"İNCELEME GEREKLİ - Kampanya Tanımsız")', None, True),
-    ("Tarih Dışı Satış Sayısı", f'=COUNTIF({K_T_RNG},"İNCELEME GEREKLİ - Tarih Dışı Satış")', None, True),
-    ("Hakediş Süresi Aşılan (RİSK) Satış Sayısı", f'=COUNTIF({K_T_RNG},"İNCELEME GEREKLİ - Hakediş Süresi Aşıldı")', None, True),
-    ("Henüz Ödenmemesi Gereken (Bekleyen) Satış Sayısı", f'=COUNTIF({K_T_RNG},"Bekleniyor")', None, False),
-    ("İncelenmesi Gereken Toplam Satış Sayısı", f'=SUMPRODUCT(--(LEFT({K_T_RNG},16)="İNCELEME GEREKLİ"))', None, True),
-    ("Uygun / Sorunsuz Satış Sayısı", f'=COUNTIF({K_T_RNG},"Uygun")', None, False),
+    ("Faturada Bulunan Toplam Tutar", f'=SUMIF({K_A_RNG},"<>",{K_T_RNG})', CUR, False),
+    ("Toplam Tutar Farkı", f'=SUMIF({K_A_RNG},"<>",{K_U_RNG})', CUR, False),
+    ("Eksik Ödenmiş Satış Sayısı", f'=COUNTIF({K_V_RNG},"EKSİK ÖDENMİŞ")', None, True),
+    ("Fazla Ödenmiş Satış Sayısı", f'=COUNTIF({K_V_RNG},"FAZLA ÖDENMİŞ")', None, True),
+    ("Kampanya Tanımsız (Kampanyalar Sekmesinde Yok)", f'=COUNTIF({K_W_RNG},"İNCELEME GEREKLİ - Kampanya Tanımsız")', None, True),
+    ("Tarih Dışı Satış Sayısı", f'=COUNTIF({K_W_RNG},"İNCELEME GEREKLİ - Tarih Dışı Satış")', None, True),
+    ("Hakediş Süresi Aşılan (RİSK) Satış Sayısı", f'=COUNTIF({K_W_RNG},"İNCELEME GEREKLİ - Hakediş Süresi Aşıldı")', None, True),
+    ("Nakliye/Montaj Tutarsızlığı Olan Satış Sayısı", f'=COUNTIF({K_W_RNG},"İNCELEME GEREKLİ - Nakliye/Montaj Tutarsızlığı")', None, True),
+    ("Henüz Faturalanmamış (Bekleyen) Satış Sayısı", f'=COUNTIF({K_W_RNG},"Bekleniyor*")', None, False),
+    ("İncelenmesi Gereken Toplam Satış Sayısı", f'=SUMPRODUCT(--(LEFT({K_W_RNG},16)="İNCELEME GEREKLİ"))', None, True),
+    ("Uygun / Sorunsuz Satış Sayısı", f'=COUNTIF({K_W_RNG},"Uygun")', None, False),
 ]
 r = 4
 for label, formula, fmt, warn in summary:
@@ -802,14 +861,14 @@ def protect_formula_sheet(ws_obj, max_row, max_col, unlock_ranges=()):
     ws_obj.protection.insertRows = False
     ws_obj.protection.deleteRows = False
 
-# DIVA Satislari: kolon 1-35 (ham veri girisi) acik, 36-44 (formul) kilitli
-protect_formula_sheet(wb["DIVA Satislari"], DS_LAST, 44, unlock_ranges=[(2, DS_LAST, 1, 35)])
+# DIVA Satislari: kolon 1-35 (ham veri girisi) acik, 36-45 (formul) kilitli
+protect_formula_sheet(wb["DIVA Satislari"], DS_LAST, KURAL_C, unlock_ranges=[(2, DS_LAST, 1, 35)])
 # E2E: kolon 1-38 acik, 39-48 kilitli
 protect_formula_sheet(wb["E2E Nakliye Montaj"], E2E_LAST, 48, unlock_ranges=[(2, E2E_LAST, 1, 38)])
-# Hakedis Fatura Detay: kolon 1-7 acik, 8 (anahtar) kilitli
-protect_formula_sheet(wb["Hakedis Fatura Detay"], HFD_LAST, 8, unlock_ranges=[(2, HFD_LAST, 1, 7)])
+# Hakedis Fatura Detay: kolon 1-32 (ham veri girisi) acik, 33-37 (formul) kilitli
+protect_formula_sheet(wb["Hakedis Fatura Detay"], HFD_LAST, HFD_TETIK_C, unlock_ranges=[(2, HFD_LAST, 1, 32)])
 # Kontrol, Yil Sonu Kontrolu, Ozet: tamamen formul, hicbir yer acik degil
-protect_formula_sheet(wb["Kontrol"], K_LAST, 20)
+protect_formula_sheet(wb["Kontrol"], K_LAST, W)
 protect_formula_sheet(wb["Yil Sonu Kontrolu"], 40, 4)
 protect_formula_sheet(wb["Ozet"], 40, 4)
 # Parametreler: sadece C sutunundaki giris hucreleri acik
