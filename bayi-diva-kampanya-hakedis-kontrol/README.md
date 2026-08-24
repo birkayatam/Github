@@ -22,6 +22,7 @@ aracı.
 | E2E Nakliye Montaj | **Bayi** — E2E portal raporunu (38 sütun) A3'ten yapıştırır | Yapı korumalı, veri alanı açık |
 | Hakedis Fatura Detay | **Bayi** — BSH'nin aylık hakediş detay raporunu ("... DETAY" sekmesi, 32 sütun) A3'ten yapıştırır | Yapı korumalı, veri alanı açık |
 | Kontrol | Otomatik | Tamamen formül, korumalı |
+| Sorun Raporu | Otomatik — Kontrol'de "Uygun" olmayan (eşleşmeyen, riskli, tutar uyuşmazlığı olan) tüm satırların filtrelenmiş listesi | Tamamen formül, korumalı |
 | Yil Sonu Kontrolu | Otomatik (Kural A / stok mutabakatlı bayiler için %75 nakliye-montaj oranı) | Tamamen formül, korumalı |
 | Ozet | Otomatik dashboard | Tamamen formül, korumalı |
 

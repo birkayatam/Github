@@ -606,12 +606,13 @@ KONTROL_COLS = [
     "HFD Ödeme\nYöntemi", "HFD'ye Göre\nKural", "HFD\nYöntem 1", "HFD Hakediş\nTetikleyici Tarih",
     "Süre İçinde\nTamamlandı mı", "E2E: Nakliye\nTamamlandı mı", "E2E: Montaj\nTamamlandı mı",
     "E2E-HFD\nTutarlılığı", "Faturada\nBulunan Tutar", "Tutar\nFarkı", "Tutar\nDurumu", "GENEL DURUM",
+    "Sorun Raporu\nSıra No\n(yardımcı)",
 ]
-set_widths(ws, [13, 12, 16, 11, 26, 12, 12, 11, 13, 18, 13, 13, 16, 13, 14, 12, 12, 12, 14, 13, 11, 15, 24])
+set_widths(ws, [13, 12, 16, 11, 26, 12, 12, 11, 13, 18, 13, 13, 16, 13, 14, 12, 12, 12, 14, 13, 11, 15, 24, 12])
 header_row(ws, 1, KONTROL_COLS, CALC_HEADER_FILL, HEADER_FONT, height=48)
 
 K_FIRST, K_LAST = DS_FIRST, DS_LAST  # 1:1 aligned with DIVA Satislari rows
-(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W) = range(1, 24)
+(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X) = range(1, 25)
 
 L_ = get_column_letter
 for row in range(K_FIRST, K_LAST + 1):
@@ -632,7 +633,8 @@ for row in range(K_FIRST, K_LAST + 1):
     a = f"{L_(A)}{row}"; f = f"{L_(F)}{row}"; g = f"{L_(G)}{row}"; h = f"{L_(H)}{row}"
     i_ = f"{L_(I)}{row}"; k = f"{L_(K)}{row}"; n = f"{L_(N)}{row}"; o = f"{L_(O)}{row}"
     p = f"{L_(P)}{row}"; q = f"{L_(Q)}{row}"; r_ = f"{L_(R)}{row}"; s_ = f"{L_(S)}{row}"
-    t = f"{L_(T)}{row}"; u = f"{L_(U)}{row}"; v = f"{L_(V)}{row}"
+    t = f"{L_(T)}{row}"; u = f"{L_(U)}{row}"; v = f"{L_(V)}{row}"; w = f"{L_(W)}{row}"
+    w_grow = f"${L_(W)}$3:{L_(W)}{row}"
 
     match_e2e = f'MATCH({ds_key2},{E2E_KEY_RNG},0)'
     match_hfd = f'MATCH({ds_key},{HFD_KEY_RNG},0)'
@@ -669,6 +671,7 @@ for row in range(K_FIRST, K_LAST + 1):
             f'IF(LEFT({s_},9)="UYUŞMUYOR","İNCELEME GEREKLİ - Nakliye/Montaj Tutarsızlığı",'
             f'IF(OR({v}="EKSİK ÖDENMİŞ",{v}="FAZLA ÖDENMİŞ"),"İNCELEME GEREKLİ - Tutar Uyuşmazlığı",'
             f'"Uygun")))))))', None),
+        X: (f'=IF(OR({w}="",{w}="Uygun"),"",SUMPRODUCT(({w_grow}<>"Uygun")*({w_grow}<>"")*1))', None),
     }
     for col, (formula, fmt) in cells.items():
         c = ws.cell(row=row, column=col, value=formula)
@@ -681,6 +684,11 @@ for row in range(K_FIRST, K_LAST + 1):
             c.font = Font(name=FONT, size=9, bold=True)
 
 K_A_RNG = f"Kontrol!${L_(A)}${K_FIRST}:${L_(A)}${K_LAST}"
+K_B_RNG = f"Kontrol!${L_(B)}${K_FIRST}:${L_(B)}${K_LAST}"
+K_C_RNG = f"Kontrol!${L_(C)}${K_FIRST}:${L_(C)}${K_LAST}"
+K_D_RNG = f"Kontrol!${L_(D)}${K_FIRST}:${L_(D)}${K_LAST}"
+K_E_RNG = f"Kontrol!${L_(E)}${K_FIRST}:${L_(E)}${K_LAST}"
+K_K_RNG = f"Kontrol!${L_(K)}${K_FIRST}:${L_(K)}${K_LAST}"
 K_F_RNG = f"Kontrol!${L_(F)}${K_FIRST}:${L_(F)}${K_LAST}"
 K_I_RNG = f"Kontrol!${L_(I)}${K_FIRST}:${L_(I)}${K_LAST}"
 K_J_RNG = f"Kontrol!${L_(J)}${K_FIRST}:${L_(J)}${K_LAST}"
@@ -690,8 +698,68 @@ K_T_RNG = f"Kontrol!${L_(T)}${K_FIRST}:${L_(T)}${K_LAST}"
 K_U_RNG = f"Kontrol!${L_(U)}${K_FIRST}:${L_(U)}${K_LAST}"
 K_V_RNG = f"Kontrol!${L_(V)}${K_FIRST}:${L_(V)}${K_LAST}"
 K_W_RNG = f"Kontrol!${L_(W)}${K_FIRST}:${L_(W)}${K_LAST}"
+K_X_RNG = f"Kontrol!${L_(X)}${K_FIRST}:${L_(X)}${K_LAST}"
 
 print("Part 6 (Kontrol) done")
+
+# ============================================================
+# 7b) SORUN RAPORU  (Kontrol'deki "Uygun" olmayan tum satirlarin ozetlenmis listesi)
+# ============================================================
+ws = wb.create_sheet("Sorun Raporu")
+ws.sheet_view.showGridLines = False
+ws.freeze_panes = "A3"
+
+SR_COLS = [
+    "Sıra", "Fatura No", "Ürün Kodu", "Ad Soyad", "Fatura\nTarihi", "Paket Adı\n(Kampanya)",
+    "Beklenen\nHakediş Tutarı", "Hakediş\nFaturasında\nBulundu mu", "Faturada\nBulunan Tutar",
+    "Tutar\nFarkı", "SORUN / DURUM",
+]
+set_widths(ws, [7, 13, 12, 16, 11, 26, 13, 13, 13, 11, 30])
+header_row(ws, 1, SR_COLS, WARN_FILL, Font(name=FONT, size=9, bold=True, color="C00000"), height=44)
+
+note = ws.cell(row=1, column=13,
+    value="Bu liste, 'Kontrol' sekmesinde GENEL DURUM sütunu 'Uygun' OLMAYAN (henüz faturalanmamış, "
+          "kampanya/tarih dışı, süresi aşmış, tutar uyuşmazlığı veya nakliye-montaj tutarsızlığı olan) "
+          "tüm satırları otomatik listeler. Kaynak veriler güncellendikçe bu sayfa da otomatik güncellenir.")
+note.font = NOTE_FONT
+note.alignment = Alignment(wrap_text=True, vertical="center")
+ws.row_dimensions[1].height = 44
+
+SR_FIRST, SR_LAST = 3, K_LAST - K_FIRST + 3  # ayni kapasite (Kontrol satir sayisi kadar)
+(SA, SB, SC, SD, SE, SF, SG, SH, SI, SJ, SK) = range(1, 12)
+for row in range(SR_FIRST, SR_LAST + 1):
+    rank = row - (SR_FIRST - 1)
+    ca = ws.cell(row=row, column=SA, value=rank)
+    ca.font = FORMULA_FONT
+    ca.border = BORDER
+    ca.alignment = CENTER
+    sa = f"{L_(SA)}{row}"
+    match_rank = f'MATCH({sa},{K_X_RNG},0)'
+    cells = {
+        SB: (f'=IFERROR(INDEX({K_A_RNG},{match_rank}),"")', None),
+        SC: (f'=IFERROR(INDEX({K_B_RNG},{match_rank}),"")', None),
+        SD: (f'=IFERROR(INDEX({K_C_RNG},{match_rank}),"")', None),
+        SE: (f'=IFERROR(INDEX({K_D_RNG},{match_rank}),"")', DATE_FMT),
+        SF: (f'=IFERROR(INDEX({K_E_RNG},{match_rank}),"")', None),
+        SG: (f'=IFERROR(INDEX({K_I_RNG},{match_rank}),"")', CUR),
+        SH: (f'=IFERROR(INDEX({K_K_RNG},{match_rank}),"")', None),
+        SI: (f'=IFERROR(INDEX({K_T_RNG},{match_rank}),"")', CUR),
+        SJ: (f'=IFERROR(INDEX({K_U_RNG},{match_rank}),"")', CUR),
+        SK: (f'=IFERROR(INDEX({K_W_RNG},{match_rank}),"")', None),
+    }
+    for col, (formula, fmt) in cells.items():
+        c = ws.cell(row=row, column=col, value=formula)
+        c.font = FORMULA_FONT
+        c.border = BORDER
+        c.alignment = CENTER
+        if fmt:
+            c.number_format = fmt
+        if col == SK:
+            c.font = Font(name=FONT, size=9, bold=True, color="C00000")
+        if col == SA:
+            c.font = FORMULA_FONT
+
+print("Part 6b (Sorun Raporu) done")
 
 # ============================================================
 # 8) YIL SONU KONTROLU  (Kural A bayileri icin %75 nakliye/montaj orani)
@@ -867,8 +935,9 @@ protect_formula_sheet(wb["DIVA Satislari"], DS_LAST, KURAL_C, unlock_ranges=[(2,
 protect_formula_sheet(wb["E2E Nakliye Montaj"], E2E_LAST, 48, unlock_ranges=[(2, E2E_LAST, 1, 38)])
 # Hakedis Fatura Detay: kolon 1-32 (ham veri girisi) acik, 33-37 (formul) kilitli
 protect_formula_sheet(wb["Hakedis Fatura Detay"], HFD_LAST, HFD_TETIK_C, unlock_ranges=[(2, HFD_LAST, 1, 32)])
-# Kontrol, Yil Sonu Kontrolu, Ozet: tamamen formul, hicbir yer acik degil
-protect_formula_sheet(wb["Kontrol"], K_LAST, W)
+# Kontrol, Sorun Raporu, Yil Sonu Kontrolu, Ozet: tamamen formul, hicbir yer acik degil
+protect_formula_sheet(wb["Kontrol"], K_LAST, X)
+protect_formula_sheet(wb["Sorun Raporu"], SR_LAST, SK)
 protect_formula_sheet(wb["Yil Sonu Kontrolu"], 40, 4)
 protect_formula_sheet(wb["Ozet"], 40, 4)
 # Parametreler: sadece C sutunundaki giris hucreleri acik
@@ -879,14 +948,14 @@ wb.security = openpyxl.workbook.protection.WorkbookProtection(
 )
 
 ORDER = ["Talimatlar", "Parametreler", "Kampanyalar", "DIVA Satislari", "E2E Nakliye Montaj",
-         "Hakedis Fatura Detay", "Kontrol", "Yil Sonu Kontrolu", "Ozet"]
+         "Hakedis Fatura Detay", "Kontrol", "Sorun Raporu", "Yil Sonu Kontrolu", "Ozet"]
 wb._sheets = [wb[name] for name in ORDER]
 wb.active = 0
 
 TAB_COLORS = {
     "Talimatlar": "1F4E78", "Parametreler": "1F4E78", "Kampanyalar": "BF8F00",
     "DIVA Satislari": "2E75B6", "E2E Nakliye Montaj": "2E75B6", "Hakedis Fatura Detay": "2E75B6",
-    "Kontrol": "548235", "Yil Sonu Kontrolu": "C00000", "Ozet": "548235",
+    "Kontrol": "548235", "Sorun Raporu": "C00000", "Yil Sonu Kontrolu": "C00000", "Ozet": "548235",
 }
 for name, color in TAB_COLORS.items():
     wb[name].sheet_properties.tabColor = color
