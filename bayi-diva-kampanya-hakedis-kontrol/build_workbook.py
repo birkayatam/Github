@@ -83,12 +83,26 @@ blocks = [
      "35 sütun) olduğu gibi kopyalayıp A3 hücresinden başlayarak yapıştırır.\n"
      "'E2E Nakliye Montaj' sekmesine bayi, E2E portaldan alınan raporu (MerkezKodu...PlatformName, 38 sütun) A3 "
      "hücresinden başlayarak yapıştırır.\n"
-     "'Hakedis Fatura Detay' sekmesine bayi, BSH'nin kestiği hakediş faturasının satır detayını yapıştırır "
-     "(bu sekmenin sütun yapısı, ilk gerçek örnek dosya incelendikten sonra kesinleştirilecektir; şimdilik "
-     "eşleştirme için gereken asgari alanlar tanımlanmıştır)."),
+     "'Hakedis Fatura Detay' sekmesine bayi, BSH'nin her ay gönderdiği hakediş detay raporunu (\"...DETAY\" "
+     "sekmesi, 32 sütun) yapıştırır."),
     ("EŞLEŞTİRME ANAHTARI",
      "Tüm kaynaklar 'DİVA Fatura No (26 ile başlayan) + Ürün Kodu' ikilisi ile eşleştirilir. 'Kontrol' sekmesi bu "
      "anahtarla otomatik birleştirme yapar ve nihai durumu üretir."),
+    ("HAKEDİŞ VERİSİNİ AY AY BİRİKTİRİN - ÇOK ÖNEMLİ",
+     "BSH hakediş faturalarını aylık kesiyor (örn. Temmuz'da tamamlanan nakliye/montajların hakedişi Ağustos'ta "
+     "ödenir). Bir satışın hakedişi HER ZAMAN satış ayından SONRAKİ bir ayda görünür; bazen bu gecikme birkaç ay "
+     "sürebilir (kampanyanın 'Hakediş Son Tarihi'ne kadar). Bu yüzden 'Hakedis Fatura Detay' sekmesine SADECE en "
+     "son ayın dosyasını yapıştırıp ÜZERİNE YAZMAYIN — her ay gelen yeni hakediş detayını, sekmedeki mevcut "
+     "satırların ALTINA EKLEYEREK biriktirin. Aksi halde, örneğin Haziran ayında yapılan ama hakedişi daha "
+     "önceki bir ayda (Temmuz'dan önce) zaten ödenmiş bir satış, sadece son ayın dosyası yüklüyken "
+     "sistemde 'henüz faturalanmamış' gibi görünebilir; oysa hakedişi çoktan ödenmiş, sadece o ayın kaydı "
+     "elinizde yok.\n"
+     "Veriyi biriktirmeyi unutursanız diye 'Kontrol' sekmesinde otomatik bir güvenlik uyarısı var: sistem, "
+     "yüklü hakediş verisinin kapsadığı EN ESKİ fatura tarihini kendisi hesaplar ('Hakedis Fatura Detay' "
+     "sekmesi, AN2 hücresi) ve bu tarihten ÖNCEKİ bir satışın hakedişi sistemde bulunamıyorsa, 'Bekleniyor - "
+     "Henüz Faturalanmadı' yerine 'Bekleniyor - DİKKAT - Eski Ay Hakediş Dosyası Yüklenmemiş Olabilir' uyarısını "
+     "gösterir. Bu uyarı, o satışın kesin olarak ödenip ödenmediğini SÖYLEMEZ — sadece 'bu konuda emin olabilmek "
+     "için o döneme ait hakediş dosyasını da yüklemeniz gerekiyor' der."),
     ("BİLİNEN VERİ SINIRLAMALARI",
      "E2E raporundaki tarih alanları (SiparisTarihi, TeslimatIstenilenTarih, MontajIstenilenilenTarih, "
      "IrsaliyeTarihi) DİVA/E2E tarafından METİN olarak farklı biçimlerde gelmektedir; 'E2E Nakliye Montaj' "
@@ -771,6 +785,37 @@ note.font = NOTE_FONT
 note.alignment = Alignment(wrap_text=True, vertical="center")
 ws.row_dimensions[1].height = 44
 
+L0 = get_column_letter
+hfd_fatno_rng = f"${L0(HFD_FATNO_C)}${HFD_FIRST}:${L0(HFD_FATNO_C)}${HFD_LAST}"
+hfd_fattar_rng = f"${L0(HFD_FATTAR_C)}${HFD_FIRST}:${L0(HFD_FATTAR_C)}${HFD_LAST}"
+
+cov_lbl1 = ws.cell(row=2, column=39, value="Yüklü veride EN ESKİ hakediş fatura tarihi (otomatik):")
+cov_lbl1.font = LABEL_FONT
+cov_lbl1.alignment = Alignment(wrap_text=True, vertical="center")
+cov_val1 = ws.cell(row=2, column=40, value=f'=IFERROR(MINIFS({hfd_fattar_rng},{hfd_fatno_rng},"<>"),"")')
+cov_val1.font = Font(name=FONT, size=10, bold=True, color="C00000")
+cov_val1.number_format = DATE_FMT
+cov_val1.alignment = Alignment(horizontal="center")
+
+cov_lbl2 = ws.cell(row=3, column=39, value="Yüklü veride EN YENİ hakediş fatura tarihi (otomatik):")
+cov_lbl2.font = LABEL_FONT
+cov_lbl2.alignment = Alignment(wrap_text=True, vertical="center")
+cov_val2 = ws.cell(row=3, column=40, value=f'=IFERROR(MAXIFS({hfd_fattar_rng},{hfd_fatno_rng},"<>"),"")')
+cov_val2.font = Font(name=FONT, size=10, bold=True, color="C00000")
+cov_val2.number_format = DATE_FMT
+cov_val2.alignment = Alignment(horizontal="center")
+
+cov_note = ws.cell(row=4, column=39,
+    value="Bu iki tarih, Kontrol sekmesinde 'bu satıştan önceki bir döneme ait hakediş dosyası hiç "
+          "yüklenmemiş olabilir' uyarısını üretmek için kullanılır. Hakediş verinizi ay ay BİRİKTİREREK "
+          "(üstüne yapıştırıp SİLMEDEN, altına ekleyerek) yüklerseniz bu uyarı neredeyse hiç çıkmaz.")
+cov_note.font = NOTE_FONT
+cov_note.alignment = Alignment(wrap_text=True, vertical="center")
+ws.merge_cells(start_row=4, start_column=39, end_row=4, end_column=41)
+ws.row_dimensions[4].height = 40
+
+HFD_MINFATTAR_REF = f"'Hakedis Fatura Detay'!${L0(40)}$2"
+
 example_hfd = ["7000129546|2600007552", "TRBB", "TB3", "000TRRBB32", 7000129546, 7000129546,
     "ÖRNEK BAYİ ÜNVANI LTD.ŞTİ.", 2600007552, "-", "SMS4IKW62T", "LDA", "Bosch-LDA-BULAŞIK MAKİNESİ",
     "Geçerli", "Hemen Teslim", "e-Arşiv", "1", "Tüketici", "Mutabakat Yoksa",
@@ -860,13 +905,14 @@ KONTROL_COLS = [
     "HFD Ödeme\nYöntemi", "HFD'ye Göre\nKural", "HFD\nYöntem 1", "HFD Hakediş\nTetikleyici Tarih",
     "Süre İçinde\nTamamlandı mı", "E2E: Nakliye\nTamamlandı mı", "E2E: Montaj\nTamamlandı mı",
     "E2E-HFD\nTutarlılığı", "Faturada\nBulunan Tutar", "Tutar\nFarkı", "Tutar\nDurumu", "GENEL DURUM",
+    "Veri Kapsamı\nUyarısı (eski ay\nhakedişi olabilir)",
     "Sorun Raporu\nSıra No\n(yardımcı)",
 ]
-set_widths(ws, [13, 12, 16, 11, 26, 12, 12, 11, 13, 18, 13, 13, 16, 13, 14, 12, 12, 12, 14, 13, 11, 15, 24, 12])
+set_widths(ws, [13, 12, 16, 11, 26, 12, 12, 11, 13, 18, 13, 13, 16, 13, 14, 12, 12, 12, 14, 13, 11, 15, 24, 18, 12])
 header_row(ws, 1, KONTROL_COLS, CALC_HEADER_FILL, HEADER_FONT, height=48)
 
 K_FIRST, K_LAST = DS_FIRST, DS_LAST  # 1:1 aligned with DIVA Satislari rows
-(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X) = range(1, 25)
+(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y) = range(1, 26)
 
 L_ = get_column_letter
 for row in range(K_FIRST, K_LAST + 1):
@@ -888,6 +934,7 @@ for row in range(K_FIRST, K_LAST + 1):
     i_ = f"{L_(I)}{row}"; k = f"{L_(K)}{row}"; n = f"{L_(N)}{row}"; o = f"{L_(O)}{row}"
     p = f"{L_(P)}{row}"; q = f"{L_(Q)}{row}"; r_ = f"{L_(R)}{row}"; s_ = f"{L_(S)}{row}"
     t = f"{L_(T)}{row}"; u = f"{L_(U)}{row}"; v = f"{L_(V)}{row}"; w = f"{L_(W)}{row}"
+    x = f"{L_(X)}{row}"
     w_grow = f"${L_(W)}$3:{L_(W)}{row}"
 
     match_e2e = f'MATCH({ds_key2},{E2E_KEY_RNG},0)'
@@ -920,12 +967,14 @@ for row in range(K_FIRST, K_LAST + 1):
             f'IF({u}=0,"Doğru",IF({u}>0,"EKSİK ÖDENMİŞ","FAZLA ÖDENMİŞ"))))', None),
         W: (f'=IF({a}="","",IF({f}<>"Evet","İNCELEME GEREKLİ - Kampanya Tanımsız",'
             f'IF({g}<>"Evet","İNCELEME GEREKLİ - Tarih Dışı Satış",'
-            f'IF({k}<>"Evet","Bekleniyor - Henüz Faturalanmadı",'
+            f'IF({k}<>"Evet",IF({x}<>"","Bekleniyor - "&{x},"Bekleniyor - Henüz Faturalanmadı"),'
             f'IF({p}="HAYIR - RİSK","İNCELEME GEREKLİ - Hakediş Süresi Aşıldı",'
             f'IF(LEFT({s_},9)="UYUŞMUYOR","İNCELEME GEREKLİ - Nakliye/Montaj Tutarsızlığı",'
             f'IF(OR({v}="EKSİK ÖDENMİŞ",{v}="FAZLA ÖDENMİŞ"),"İNCELEME GEREKLİ - Tutar Uyuşmazlığı",'
             f'"Uygun")))))))', None),
-        X: (f'=IF(OR({w}="",{w}="Uygun"),"",SUMPRODUCT(({w_grow}<>"Uygun")*({w_grow}<>"")*1))', None),
+        X: (f'=IF(OR({a}="",{k}<>"Hayır"),"",IF(AND({HFD_MINFATTAR_REF}<>"",{ds_tar}<{HFD_MINFATTAR_REF}),'
+            f'"DİKKAT - Eski Ay Hakediş Dosyası Yüklenmemiş Olabilir",""))', None),
+        Y: (f'=IF(OR({w}="",{w}="Uygun"),"",SUMPRODUCT(({w_grow}<>"Uygun")*({w_grow}<>"")*1))', None),
     }
     for col, (formula, fmt) in cells.items():
         c = ws.cell(row=row, column=col, value=formula)
@@ -952,7 +1001,7 @@ K_T_RNG = f"Kontrol!${L_(T)}${K_FIRST}:${L_(T)}${K_LAST}"
 K_U_RNG = f"Kontrol!${L_(U)}${K_FIRST}:${L_(U)}${K_LAST}"
 K_V_RNG = f"Kontrol!${L_(V)}${K_FIRST}:${L_(V)}${K_LAST}"
 K_W_RNG = f"Kontrol!${L_(W)}${K_FIRST}:${L_(W)}${K_LAST}"
-K_X_RNG = f"Kontrol!${L_(X)}${K_FIRST}:${L_(X)}${K_LAST}"
+K_Y_RNG = f"Kontrol!${L_(Y)}${K_FIRST}:${L_(Y)}${K_LAST}"
 
 print("Part 6 (Kontrol) done")
 
@@ -988,7 +1037,7 @@ for row in range(SR_FIRST, SR_LAST + 1):
     ca.border = BORDER
     ca.alignment = CENTER
     sa = f"{L_(SA)}{row}"
-    match_rank = f'MATCH({sa},{K_X_RNG},0)'
+    match_rank = f"MATCH({sa},{K_Y_RNG},0)"
     cells = {
         SB: (f'=IFERROR(INDEX({K_A_RNG},{match_rank}),"")', None),
         SC: (f'=IFERROR(INDEX({K_B_RNG},{match_rank}),"")', None),
@@ -1190,7 +1239,7 @@ protect_formula_sheet(wb["E2E Nakliye Montaj"], E2E_LAST, 48, unlock_ranges=[(2,
 # Hakedis Fatura Detay: kolon 1-32 (ham veri girisi) acik, 33-37 (formul) kilitli
 protect_formula_sheet(wb["Hakedis Fatura Detay"], HFD_LAST, HFD_TETIK_C, unlock_ranges=[(2, HFD_LAST, 1, 32)])
 # Kontrol, Sorun Raporu, Yil Sonu Kontrolu, Ozet: tamamen formul, hicbir yer acik degil
-protect_formula_sheet(wb["Kontrol"], K_LAST, X)
+protect_formula_sheet(wb["Kontrol"], K_LAST, Y)
 protect_formula_sheet(wb["Sorun Raporu"], SR_LAST, SK)
 protect_formula_sheet(wb["Yil Sonu Kontrolu"], 40, 4)
 protect_formula_sheet(wb["Ozet"], 40, 4)

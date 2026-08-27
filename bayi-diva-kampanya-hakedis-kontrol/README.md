@@ -47,6 +47,25 @@ Sekme koruma şifreleri dosyada saklanmaz; ilgili konuşmada ayrıca paylaşılm
   nakliye/montaj eşleştirmesi, kampanyadan bağımsız olduğu için Fatura No + Ürün Kodu ikilisini
   kullanır).
 
+## Hakediş verisini ay ay biriktirme ve "Veri Kapsamı Uyarısı"
+
+BSH hakediş faturalarını aylık kestiği ve bir satışın hakedişi satış ayından sonraki bir ayda
+(bazen kampanyanın Hakediş Son Tarihi'ne kadar birkaç ay sonra) ödendiği için, bayinin
+`Hakedis Fatura Detay` sekmesine **her ay yeni gelen raporu, önceki ayların satırlarının ALTINA
+EKLEYEREK** (üzerine yazmadan) biriktirmesi gerekir. Aksi halde, hakedişi aslında çoktan ödenmiş
+ama o ayın raporu dosyada olmayan eski bir satış, sistemde yanlışlıkla "henüz faturalanmadı" gibi
+görünebilir.
+
+Bunu tamamen önlemek mümkün olmadığından (bayi veriyi biriktirmeyi unutabilir), sistem otomatik
+bir güvenlik ağı içerir: `Hakedis Fatura Detay` sekmesi, o an yüklü verinin kapsadığı **en eski**
+hakediş fatura tarihini kendisi hesaplar (AN2 hücresi, MINIFS). `Kontrol` sekmesinde bir satış
+hakediş dosyasında bulunamıyorsa ve satışın kendi tarihi bu en-eski-kapsam tarihinden daha
+eskiyse, "Bekleniyor - Henüz Faturalanmadı" yerine **"Bekleniyor - DİKKAT - Eski Ay Hakediş
+Dosyası Yüklenmemiş Olabilir"** uyarısı gösterilir (Kontrol sütun X: "Veri Kapsamı Uyarısı").
+Bu uyarı satışın kesin ödenip ödenmediğini söylemez; sadece o döneme ait hakediş dosyasının da
+yüklenmesi gerektiğini işaret eder. Talimatlar sekmesinde "HAKEDİŞ VERİSİNİ AY AY BİRİKTİRİN"
+başlığı altında ayrıntılı açıklanmıştır.
+
 ## Bilinen sınırlamalar / açık konular
 
 - E2E raporundaki tarih alanları metin olarak farklı biçimlerde geldiğinden, montajın gerçek
