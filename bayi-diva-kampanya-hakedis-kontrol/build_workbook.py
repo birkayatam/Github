@@ -4,6 +4,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.utils import get_column_letter
 from openpyxl.comments import Comment
+from openpyxl.formatting.rule import FormulaRule
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -114,7 +115,12 @@ blocks = [
      "bu satışlarda sistem otomatik olarak montaj verisini esas alır."),
     ("RENK KODLARI",
      "Sarı zemin + mavi yazı = elle doldurulacak/yapıştırılacak alan. Gri başlık = kaynak rapordan birebir gelen "
-     "ham sütun. Mavi başlık = otomatik hesaplanan sütun, dokunmayın. Turuncu zemin = risk/uyuşmazlık uyarısı."),
+     "ham sütun. Mavi başlık = otomatik hesaplanan sütun, dokunmayın. Turuncu zemin = risk/uyuşmazlık uyarısı. "
+     "'DİVA Satışları', 'E2E Nakliye Montaj' ve 'Hakedis Fatura Detay' sekmelerinde, yapıştırdığınız verinin "
+     "bittiği satırın hemen üstünde otomatik MAVİ bir çizgi belirir — bu çizgi 'veriniz buraya kadar, altı "
+     "hâlâ boş' demektir; yeni veri eklerken bu çizginin altına doğru devam edin. 'Kontrol' ve 'Sorun Raporu' "
+     "sekmelerinde GENEL DURUM/SORUN hücreleri otomatik renklenir: YEŞİL = Uygun, KIRMIZI = İnceleme Gerekli, "
+     "SARI = Bekleniyor."),
 ]
 r = 4
 for title, body in blocks:
@@ -1195,6 +1201,46 @@ ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
 ws.row_dimensions[r].height = 40
 
 print("Part 8 (Ozet) done")
+
+# ============================================================
+# 9b) KOSULLU BICIMLENDIRME: DURUM RENK KODU + VERI SINIRI CIZGISI
+# ============================================================
+GOOD_FILL = PatternFill("solid", fgColor="C6EFCE")
+BAD_FILL = PatternFill("solid", fgColor="FFC7CE")
+WARN_STATUS_FILL = PatternFill("solid", fgColor="FFEB9C")
+GOOD_FONT = Font(name=FONT, size=9, bold=True, color="006100")
+BAD_FONT = Font(name=FONT, size=9, bold=True, color="9C0006")
+WARN_STATUS_FONT = Font(name=FONT, size=9, bold=True, color="9C6500")
+BOUNDARY_BORDER = Border(top=Side(style="medium", color="2E75B6"))
+
+
+def add_status_color_rules(ws_obj, col_letter, first_row, last_row, include_good=True):
+    rng = f"{col_letter}{first_row}:{col_letter}{last_row}"
+    anchor = f"{col_letter}{first_row}"
+    if include_good:
+        ws_obj.conditional_formatting.add(
+            rng, FormulaRule(formula=[f'{anchor}="Uygun"'], fill=GOOD_FILL, font=GOOD_FONT))
+    ws_obj.conditional_formatting.add(
+        rng, FormulaRule(formula=[f'ISNUMBER(SEARCH("İNCELEME GEREKLİ",{anchor}))'], fill=BAD_FILL, font=BAD_FONT))
+    ws_obj.conditional_formatting.add(
+        rng, FormulaRule(formula=[f'ISNUMBER(SEARCH("Bekleniyor",{anchor}))'], fill=WARN_STATUS_FILL, font=WARN_STATUS_FONT))
+
+
+def add_data_boundary_marker(ws_obj, key_col, first_row, last_row, last_col):
+    key_letter = get_column_letter(key_col)
+    formula = f'AND(${key_letter}{first_row}="",${key_letter}{first_row - 1}<>"")'
+    rng = f"A{first_row}:{get_column_letter(last_col)}{last_row}"
+    ws_obj.conditional_formatting.add(rng, FormulaRule(formula=[formula], border=BOUNDARY_BORDER))
+
+
+add_status_color_rules(wb["Kontrol"], L_(W), K_FIRST, K_LAST)
+add_status_color_rules(wb["Sorun Raporu"], get_column_letter(SK), SR_FIRST, SR_LAST, include_good=False)
+
+add_data_boundary_marker(wb["DIVA Satislari"], FATURANO_C, DS_FIRST, DS_LAST, KURAL_C)
+add_data_boundary_marker(wb["E2E Nakliye Montaj"], DIVAFNO_C, E2E_FIRST, E2E_LAST, 48)
+add_data_boundary_marker(wb["Hakedis Fatura Detay"], HFD_FATNO_C, HFD_FIRST, HFD_LAST, HFD_TETIK_C)
+
+print("Part 9b (Kosullu bicimlendirme) done")
 
 # ============================================================
 # 10) SEKME KORUMASI VE DUZEN
