@@ -93,6 +93,36 @@ python -m qlik_order_recommender.order_pipeline \
   kullanılacak, geçmiş veriye dayalı ürün/adet gerekçe metni (okunabilirlik
   için en yüksek adetli ilk 15 ürün listelenir, tam liste Excel'de).
 
+### Masaüstü arayüzü (GUI) ve meslektaşlarla paylaşma
+
+Komut satırı yerine, dosya seçip "Çalıştır" demeye dayanan basit bir pencere
+için:
+
+```bash
+python -m qlik_order_recommender.gui
+```
+
+Bu, Python kurulu bir makinede doğrudan çalışır. Python/Git kurulumu olmayan
+meslektaşlarınızla paylaşmak için tek bir `.exe` dosyası olarak
+paketleyebilirsiniz — **bu derleme adımı Windows üzerinde yapılmalı**
+(PyInstaller çapraz derleme yapmaz), yani kendi Windows bilgisayarınızda,
+kurulu olan `.venv` içinde çalıştırın:
+
+```bash
+pip install -r requirements-build.txt
+pyinstaller --onefile --windowed --name qlik-siparis-onerisi src/qlik_order_recommender/gui.py
+```
+
+Üretilen `dist/qlik-siparis-onerisi.exe` dosyası (~150-250 MB, pandas/
+scikit-learn içerdiği için) tek başına çalışır — Python kurulumu gerektirmez;
+e-posta, Teams veya paylaşımlı bir sürücü ile dağıtabilirsiniz.
+
+**Bilinen risk:** Kurumsal güvenlik yazılımları (ör. Bosch AppLocker),
+imzasız/tanınmayan `.exe` dosyalarını "potansiyel zararlı yazılım" diye
+engelleyebilir — bu README'yi hazırlarken tam olarak bu sorunla karşılaşıldı
+(bkz. Python'un kendisi Downloads klasöründen engellenmişti). Böyle bir
+durumda IT ile görüşüp dosyayı güvenilir listeye ekletmeniz gerekebilir.
+
 ## Hedef tahmin motoru (`pipeline`)
 
 Dışarıdan verilmiş bir bayi/ürün hedefi olmadığı, hedefin bizzat geçmiş
@@ -144,6 +174,7 @@ src/qlik_order_recommender/
   order_insight.py          # Claude API (veya sablon) ile urun-adet gerekcesi
   order_report.py             # Excel (bayi ozet + detay + doldurulmus kota dosyasi) + Markdown
   order_pipeline.py             # uctan uca orkestrasyon + CLI
+  gui.py                          # tkinter masaustu arayuzu (.exe paketleme icin)
 
   # Hedef tahmin motoru (harici hedef olmadigi senaryo icin)
   ingestion.py           # CSV/Excel okuma + mapping ile normalize etme

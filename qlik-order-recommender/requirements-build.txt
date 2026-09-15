@@ -1,0 +1,3 @@
+# Sadece .exe'yi derleyecek kisiye gerekli -- son kullaniciya (exe'yi
+# calistiracak meslektaslara) gerekmez.
+pyinstaller>=6.0
