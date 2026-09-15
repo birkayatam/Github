@@ -1,0 +1,27 @@
+# Siparis dagitim motoru (order_pipeline) icin sutun eslemesi ornegi.
+# Asagidaki degerler zaten varsayilan (gercek Qlik/Diva disa aktarimlarinin
+# gercek basliklari) oldugu icin, raporlarinizin baslikları bunlarla
+# birebir ayniysa bu dosyayi hic vermenize gerek yok. Farkliysa kopyalayip
+# kendi rapor sutunlarinizla degistirin ve --mapping ile verin.
+
+transactions:
+  dealer_name: "Nihai Ünvan"
+  lph2: "LPH2"
+  lph3: "LPH3"
+  product_code: "UrunKodu"
+  month: "YılAy"
+  bildirim: "Diva Bildirim"
+  stok: "Diva Stok"
+  ileri_teslim: "Diva - İleri Teslim"
+  fatura: "Fatura"
+  montaj: "Montaj"
+
+dealer_targets:
+  dealer_name: "Ünvan"
+  lph2: "LPH-2"
+  hedef: "Hedef Q4"
+  fiili: "Fiili Q4"
+
+product_quota:
+  product_code: "ÜRÜNLER"
+  quota: "ADET"
