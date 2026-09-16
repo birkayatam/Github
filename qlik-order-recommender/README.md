@@ -41,9 +41,21 @@ export ANTHROPIC_API_KEY=sk-...
   olarak korunur (bir ürün için tüm bayilere önerilen toplam adet, o ürünün
   kotasını asla aşmaz); bir bayinin favori ürününde kota yetersiz kalırsa,
   kalan ihtiyacı otomatik olarak diğer uygun ürünlere yeniden dağıtılır.
+- **Gerçek talep, sell-in değil**: Önceliklendirme `Fatura` (bizim bayiye
+  sevkiyatımız / sell-in) yerine `Diva Bildirim` + `Diva İleri Teslim` +
+  `Montaj` (bayinin son müşteriye gerçekten sattığı/kurduğu adet / sell-out)
+  ağırlıklı bir sinyale dayanır — Fatura küçük bir payla kalır. Ayrıca
+  **sell-through oranı** (`(Bildirim+Montaj)/Fatura`) hesaplanır: bu oran
+  düşükse (muhtemelen hâlâ stokta bekleyen bir ürün) o ürünün önceliği
+  otomatik hafifletilir.
+- **Sezonsallık ve pazar geneli bağlam**: Şirketin mali çeyrek tanımına göre
+  (Eylül-Ekim-Kasım = Q4 vb.) hedef dönem otomatik tespit edilir; hem bayi
+  hem pazar (tüm bayiler) genelinde bu dönemin geçmiş yıllardaki
+  mevsimsellik endeksi ve yıl-yıl (YoY) büyümesi hesaplanıp hem tahsis
+  ağırlığına hem ikna metnine yansıtılır (bkz. `order_features.py`).
 - **İkna edilebilirlik**: Her ürün-adet önerisi, o bayinin bu üründeki
-  gerçek geçmiş fatura verisiyle (kaç ay, kaç adet, en son ne zaman alım
-  yapmış) gerekçelendirilir.
+  gerçek geçmiş satış/kurulum verisiyle, sell-through durumuyla ve
+  sezonsal/pazar geneli bağlamla gerekçelendirilir.
 - **Yeni ürünler dışlanmaz**: Bir bayinin hiç almadığı ama pazarda talep
   gören bir ürün, küçük bir "pazar ortalaması" payıyla yine de önerilebilir.
 
@@ -83,12 +95,15 @@ python -m qlik_order_recommender.order_pipeline \
 ```
 
 Çıktılar:
-- `reports/siparis_onerileri.xlsx` — 3 sayfa:
+- `reports/siparis_onerileri.xlsx` — 4 sayfa:
   - **Bayi Özet**: her bayi için hedef/fiili/kalan/önerilen toplam/karşılanamayan.
   - **Bayi x Ürün Tahsis**: bayi × ürün × önerilen adet (uzun format, tam detay).
   - **Siparis Dosyasi**: girdi kota dosyanızın, `SİPARİŞ` sütunu her ürün için
     tahsis edilen toplam adetle, kalan kota ve "kota aşıldı mı" bilgisiyle
     doldurulmuş hali.
+  - **Pazar Genel Bakis**: ürün bazında, tüm bayilerden bağımsız pazar geneli
+    mevsimsellik endeksi, YoY büyüme ve ortalama sell-through — hedef dönemin
+    genel resmine tek bakışta cevap.
 - `reports/bayi_raporlari/<bayi adı>.md` — her bayi için saha ziyaretinde
   kullanılacak, geçmiş veriye dayalı ürün/adet gerekçe metni (okunabilirlik
   için en yüksek adetli ilk 15 ürün listelenir, tam liste Excel'de).
@@ -175,9 +190,10 @@ pytest tests/
 src/qlik_order_recommender/
   # Siparis dagitim motoru (gercek is sureci)
   order_ingestion.py    # transactions / dealer_targets / product_quota okuma + bayi adi eslendirme
-  allocation.py           # yinelemeli oransal dagitim: bayi kalanini urun kotasini asmadan dagitir
-  order_insight.py          # Claude API (veya sablon) ile urun-adet gerekcesi
-  order_report.py             # Excel (bayi ozet + detay + doldurulmus kota dosyasi) + Markdown
+  order_features.py       # gercek talep sinyali, sell-through, sezonsallik/YoY (bayi + pazar geneli)
+  allocation.py              # yinelemeli oransal dagitim: bayi kalanini urun kotasini asmadan dagitir
+  order_insight.py             # Claude API (veya sablon) ile urun-adet gerekcesi
+  order_report.py                # Excel (bayi ozet + detay + kota dosyasi + pazar genel bakis) + Markdown
   order_pipeline.py             # uctan uca orkestrasyon + CLI
   gui.py                          # tkinter masaustu arayuzu (.exe paketleme icin)
 

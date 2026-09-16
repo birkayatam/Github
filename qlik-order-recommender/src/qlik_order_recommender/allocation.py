@@ -15,8 +15,10 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from .order_features import SELL_THROUGH_DAMPENING_FACTOR, SELL_THROUGH_LOW
+from .order_features import demand_signal as _demand_signal
+
 MARKET_SMOOTHING = 0.15
-BILDIRIM_WEIGHT = 0.3
 MAX_ITERATIONS = 25
 CONVERGENCE_EPS = 1e-6
 
@@ -25,22 +27,48 @@ def compute_affinity(
     transactions: pd.DataFrame,
     dealer_names: list[str],
     product_codes: list[str],
+    product_seasonal_index: pd.Series | None = None,
+    sell_through: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """dealer_name x product_code agirlik matrisi. Gecmis Fatura
-    (gerceklesen, negatifler/iadeler 0'a kirpilir) + kucuk bir agirlikla
-    Diva Bildirim (beyan) kullanilir. Bir bayinin hic gecmisi olmadigi
-    urunler icin, o urunun pazar ortalamasindan kucuk bir pay (smoothing)
-    eklenir -- boylece yeni/az satilmis urunler de tamamen dislanmaz."""
+    """dealer_name x product_code agirlik matrisi. Temel sinyal
+    `order_features.demand_signal` -- yani gercek talep (Bildirim/Ileri
+    Teslim/Montaj = sell-out) agirlikli, Fatura (sell-in) dusuk agirlikli.
+    Bir bayinin hic gecmisi olmadigi urunler icin, o urunun pazar
+    ortalamasindan kucuk bir pay (smoothing) eklenir -- boylece yeni/az
+    satilmis urunler de tamamen dislanmaz.
+
+    `product_seasonal_index` verilirse (order_features.compute_seasonality
+    cikisi), hedef donemde tipik olarak guclu/zayif olan urunler buna gore
+    agirliklandirilir. `sell_through` verilirse (order_features.compute_
+    sell_through cikisi), belirgin sekilde stokta bekleyen (dusuk sell-
+    through) bayi-urun ciftlerinin agirligi hafifletilir -- zaten satilamamis
+    stoku olan bir urunu tekrar onermemek icin."""
     df = transactions[
         transactions["product_code"].isin(product_codes) & transactions["dealer_name"].isin(dealer_names)
     ].copy()
-    df["signal"] = df["fatura"].clip(lower=0) + BILDIRIM_WEIGHT * df["bildirim"].clip(lower=0)
+    df["signal"] = _demand_signal(df)
 
     pivot = df.pivot_table(index="dealer_name", columns="product_code", values="signal", aggfunc="sum", fill_value=0.0)
     pivot = pivot.reindex(index=dealer_names, columns=product_codes, fill_value=0.0)
 
     market_avg = pivot.mean(axis=0)
-    return pivot.add(market_avg * MARKET_SMOOTHING, axis=1)
+    weight = pivot.add(market_avg * MARKET_SMOOTHING, axis=1)
+
+    if product_seasonal_index is not None:
+        factor = product_seasonal_index.reindex(product_codes).fillna(1.0)
+        weight = weight.mul(factor, axis=1)
+
+    if sell_through is not None and "sell_through_ratio" in sell_through.columns:
+        ratio = sell_through["sell_through_ratio"]
+        # Varsayilan notr (1.0): fatura gecmisi yetersizse (NaN) oran zaten
+        # yargilanamaz, ceza uygulanmaz. Sadece bilinen ve esigin altinda
+        # kalan ciftler hafifletilir.
+        damp = pd.Series(1.0, index=ratio.index)
+        damp[ratio < SELL_THROUGH_LOW] = SELL_THROUGH_DAMPENING_FACTOR
+        damp_matrix = damp.unstack("product_code").reindex(index=dealer_names, columns=product_codes, fill_value=1.0)
+        weight = weight.mul(damp_matrix)
+
+    return weight
 
 
 @dataclass

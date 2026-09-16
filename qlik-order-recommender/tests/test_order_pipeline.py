@@ -55,8 +55,13 @@ def test_order_pipeline_end_to_end(tmp_path, monkeypatch):
     quota_sheet = pd.read_excel(excel_path, sheet_name="Siparis Dosyasi")
     assert (quota_sheet["SIPARIS (tahsis edilen)"] <= quota_sheet["ADET"]).all()
 
+    overview = pd.read_excel(excel_path, sheet_name="Pazar Genel Bakis")
+    assert set(overview["Urun Kodu"]) == {"P1", "P2"}
+
     md_dir = out_dir / "bayi_raporlari"
     md_files = list(md_dir.glob("*.md"))
     assert len(md_files) == 2
     for path in md_files:
-        assert "Siparis Onerisi" in path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8")
+        assert "Siparis Onerisi" in text
+        assert "satilan-kurulan" in text  # sell-out verisine dayali gerekce uretildigini dogrula

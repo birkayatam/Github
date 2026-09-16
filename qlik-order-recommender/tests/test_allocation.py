@@ -63,3 +63,35 @@ def test_allocate_handles_dealer_with_no_history_via_market_smoothing():
 
     assert result.allocations.loc["D3"].sum() > 0
     assert result.dealer_shortfall["D3"] == 0
+
+
+def test_compute_affinity_applies_seasonal_index():
+    transactions = _synthetic_transactions()
+    baseline = compute_affinity(transactions, dealer_names=["D1", "D2"], product_codes=["P1", "P2"])
+
+    boosted = compute_affinity(
+        transactions,
+        dealer_names=["D1", "D2"],
+        product_codes=["P1", "P2"],
+        product_seasonal_index=pd.Series({"P1": 2.0, "P2": 1.0}),
+    )
+
+    assert boosted.loc["D1", "P1"] > baseline.loc["D1", "P1"]
+    assert boosted.loc["D1", "P2"] == baseline.loc["D1", "P2"]
+
+
+def test_compute_affinity_dampens_low_sell_through():
+    transactions = _synthetic_transactions()
+    baseline = compute_affinity(transactions, dealer_names=["D1", "D2"], product_codes=["P1", "P2"])
+
+    sell_through = pd.DataFrame(
+        {"sell_through_ratio": [0.05]},
+        index=pd.MultiIndex.from_tuples([("D1", "P1")], names=["dealer_name", "product_code"]),
+    )
+    dampened = compute_affinity(
+        transactions, dealer_names=["D1", "D2"], product_codes=["P1", "P2"], sell_through=sell_through
+    )
+
+    assert dampened.loc["D1", "P1"] < baseline.loc["D1", "P1"]
+    # Bilinmeyen (sell_through verisi olmayan) ciftler cezalandirilmamali.
+    assert dampened.loc["D2", "P2"] == baseline.loc["D2", "P2"]

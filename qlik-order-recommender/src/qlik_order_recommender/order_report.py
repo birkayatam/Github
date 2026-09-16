@@ -9,9 +9,32 @@ from typing import Union
 import pandas as pd
 
 from .allocation import AllocationResult
-from .order_insight import DealerOrderInsight
+from .order_insight import DealerOrderInsight, MarketContext
 
 PathLike = Union[str, Path]
+
+
+def _build_market_overview(product_quota: pd.DataFrame, market: MarketContext) -> pd.DataFrame:
+    """Urun bazinda pazar geneli (tum bayiler) mevsimsellik/YoY/sell-through
+    ozeti -- kullaniciyi sadece tek bir bayiyle sinirli birakmayan,
+    genel duruma tek bakista cevap veren referans tablo."""
+    avg_sell_through = market.sell_through["sell_through_ratio"].groupby("product_code").mean()
+
+    rows = []
+    for product in product_quota["product_code"]:
+        seasonal = float(market.product_seasonality.seasonal_index.get(product, 1.0))
+        yoy = market.product_seasonality.yoy_growth.get(product)
+        rows.append(
+            {
+                "Urun Kodu": product,
+                f"Mevsimsellik Endeksi ({market.period_label})": round(seasonal, 2),
+                "YoY Buyume (Pazar)": None if (yoy is None or pd.isna(yoy)) else round(float(yoy), 3),
+                "Ortalama Sell-Through (Pazar)": (
+                    round(float(avg_sell_through.get(product)), 2) if product in avg_sell_through.index and not pd.isna(avg_sell_through.get(product)) else None
+                ),
+            }
+        )
+    return pd.DataFrame(rows).sort_values(f"Mevsimsellik Endeksi ({market.period_label})", ascending=False)
 
 
 def build_excel_report(
@@ -20,6 +43,7 @@ def build_excel_report(
     result: AllocationResult,
     product_quota: pd.DataFrame,
     out_path: PathLike,
+    market: MarketContext | None = None,
 ) -> None:
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -61,6 +85,8 @@ def build_excel_report(
         summary_df.to_excel(writer, sheet_name="Bayi Ozet", index=False)
         detail_df.to_excel(writer, sheet_name="Bayi x Urun Tahsis", index=False)
         filled_quota.to_excel(writer, sheet_name="Siparis Dosyasi", index=False)
+        if market is not None:
+            _build_market_overview(product_quota, market).to_excel(writer, sheet_name="Pazar Genel Bakis", index=False)
 
 
 def build_markdown_reports(insights: dict[str, DealerOrderInsight], out_dir: PathLike) -> list[Path]:

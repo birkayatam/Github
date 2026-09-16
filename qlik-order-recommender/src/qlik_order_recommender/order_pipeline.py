@@ -9,8 +9,9 @@ import sys
 from pathlib import Path
 
 from .allocation import allocate, compute_affinity
+from .order_features import compute_seasonality, compute_sell_through, detect_target_quarter
 from .order_ingestion import load_order_data, resolve_dealer_names
-from .order_insight import DEFAULT_MODEL, generate_order_insight
+from .order_insight import DEFAULT_MODEL, MarketContext, generate_order_insight
 from .order_report import build_excel_report, build_markdown_reports
 
 
@@ -49,7 +50,26 @@ def run(
 
     quota = bundle.product_quota.set_index("product_code")["quota"]
 
-    affinity = compute_affinity(transactions, dealer_names=list(remaining.index), product_codes=list(quota.index))
+    target_fiscal_year, target_quarter = detect_target_quarter(transactions)
+    product_seasonality = compute_seasonality(transactions, "product_code", target_fiscal_year, target_quarter)
+    dealer_seasonality = compute_seasonality(transactions, "dealer_name", target_fiscal_year, target_quarter)
+    sell_through = compute_sell_through(transactions)
+    market = MarketContext(
+        sell_through=sell_through,
+        product_seasonality=product_seasonality,
+        dealer_seasonality=dealer_seasonality,
+        target_fiscal_year=target_fiscal_year,
+        target_quarter=target_quarter,
+    )
+    print(f"[order_pipeline] Hedef donem otomatik tespit edildi: {market.period_label}")
+
+    affinity = compute_affinity(
+        transactions,
+        dealer_names=list(remaining.index),
+        product_codes=list(quota.index),
+        product_seasonal_index=product_seasonality.seasonal_index,
+        sell_through=sell_through,
+    )
     result = allocate(remaining, quota, affinity)
 
     insights = {}
@@ -60,12 +80,13 @@ def run(
             shortfall=float(result.dealer_shortfall.get(dealer, 0.0)),
             recommendations=result.allocations.loc[dealer],
             transactions=transactions,
+            market=market,
             model=model,
         )
 
     out_dir_path = Path(out_dir)
     excel_path = out_dir_path / "siparis_onerileri.xlsx"
-    build_excel_report(targets, remaining, result, bundle.product_quota, excel_path)
+    build_excel_report(targets, remaining, result, bundle.product_quota, excel_path, market=market)
     build_markdown_reports(insights, out_dir_path / "bayi_raporlari")
 
     return excel_path
