@@ -37,6 +37,7 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 ENV/
 env.bak/
 venv.bak/
@@ -190,3 +191,6 @@ log/
 *.swp
 *.swo
 *~
+
+# qlik-order-recommender: generated pipeline output
+qlik-order-recommender/reports/

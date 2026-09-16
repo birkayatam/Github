@@ -1,0 +1,35 @@
+# Qlik'ten dışa aktarılan CSV/Excel dosyalarınızdaki gerçek sütun adlarını
+# soldaki iç şema alanlarına eşleyin. Bu dosyayı `column_mapping.yaml` olarak
+# kopyalayıp kendi raporlarınıza göre düzenleyin.
+#
+# Bu örnekteki sütun adları data/sample/ altındaki sentetik örnek verilerle
+# birebir eşleşir (ASCII, aksansız); gerçek Qlik dışa aktarımınızdaki başlıklar
+# Türkçe karakter içerebilir (örn. "Bayi Adı") -- bu durumda sadece değerleri
+# kendi dosyanızdaki gerçek başlıklarla değiştirin.
+
+dealers:
+  dealer_id: "Bayi Kodu"
+  dealer_name: "Bayi Adi"
+  region: "Bolge"
+  segment: "Segment"
+
+sales_history:
+  dealer_id: "Bayi Kodu"
+  date: "Tarih"
+  product_category: "Urun Kategorisi"
+  sales_amount: "Satis Tutari"
+  quantity: "Miktar"
+
+invoices:
+  dealer_id: "Bayi Kodu"
+  invoice_date: "Fatura Tarihi"
+  invoice_amount: "Fatura Tutari"
+  due_date: "Vade Tarihi"
+  paid_date: "Odeme Tarihi"
+  payment_status: "Odeme Durumu"
+
+targets_history:
+  dealer_id: "Bayi Kodu"
+  month: "Ay"
+  target_amount: "Hedef Tutari"
+  achieved_amount: "Gerceklesen Tutar"
