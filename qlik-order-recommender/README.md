@@ -110,8 +110,13 @@ kurulu olan `.venv` içinde çalıştırın:
 
 ```bash
 pip install -r requirements-build.txt
-pyinstaller --onefile --windowed --name qlik-siparis-onerisi src/qlik_order_recommender/gui.py
+pyinstaller --onefile --windowed --name qlik-siparis-onerisi run_gui.py
 ```
+
+(`run_gui.py` proje kök dizininde, `gui.py`'yi paket bağlamında çalıştıran
+küçük bir giriş noktası — PyInstaller'ı doğrudan `gui.py`'ye yöneltmeyin,
+o zaman `.order_pipeline` gibi göreli import'lar "attempted relative
+import with no known parent package" hatasıyla çöker.)
 
 Üretilen `dist/qlik-siparis-onerisi.exe` dosyası (~150-250 MB, pandas/
 scikit-learn içerdiği için) tek başına çalışır — Python kurulumu gerektirmez;
